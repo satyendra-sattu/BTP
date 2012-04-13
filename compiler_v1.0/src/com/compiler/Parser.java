@@ -47,7 +47,7 @@ public class Parser {
 			Utils.emitLn("CALL "+ name);
 		}
 		else
-			Utils.emitLn("MOV EAX,["+Utils.getName()+"]");
+			Utils.emitLn("MOV EAX,["+name+"]");
 	
 	}
 	
