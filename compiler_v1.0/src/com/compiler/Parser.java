@@ -35,6 +35,7 @@ public class Parser {
 		}
 		else if(Utils.isAlpha(Utils.look))
 				ident();
+		else
 			Utils.emitLn("MOV EAX,"+Utils.getNum());
 	}
 	
