@@ -4,8 +4,10 @@ public class Main {
 	
 	public static void main(String[] args){
 		Utils.init();
-		Parser.assignment();
+		//Parser.assignment();
 		//Parser.doProgram();
+		//Parser.boolExpression();
+		
 	}
 
 }

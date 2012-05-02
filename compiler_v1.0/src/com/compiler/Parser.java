@@ -1,281 +1,291 @@
 package com.compiler;
 
+
+
 //Add space error handler
 public class Parser {
 
-	public static void term(){
-		factor();
-		while(Utils.look=='*' || Utils.look=='/'){
-			Utils.emitLn("PUSH EAX");
-			switch(Utils.look){
-				case '*': multiply();break;
-				case '/': divide();break;
-				default: Utils.expected("Mulop");break;
-			}
-		}
-	}
-	
-	public static void expression(){
-		term();
-		while(Utils.look=='+' || Utils.look=='-'){
-			Utils.emitLn("PUSH EAX");
-			switch(Utils.look){
-				case '+': add();break;
-				case '-': subtract();break;
-				default: Utils.expected("Addop");break;
-			}
-		}
-	}
 	
 	public static void factor(){
-		if(Utils.look=='('){
-			Utils.matchChar('(');
-			expression();
-			Utils.matchChar(')');
+		if(Utils.token=='('){
+			Utils.next();
+			boolExpression();
+			Utils.matchString(")");
+		}else{
+			if(Utils.token=='x')
+				Utils.loadVar(Utils.value);
+			else if(Utils.token=='#')
+				Utils.loadConst(Utils.value);
+			else
+				Utils.expected("Math Factor");
+			Utils.next();
 		}
-		else if(Utils.isAlpha(Utils.look))
-				ident();
-		else
-			Utils.emitLn("MOV EAX,"+Utils.getNum());
 	}
 	
-	public static void ident(){
-		String name;
-		name=Utils.getName();
-		if(Utils.look=='('){
-			Utils.matchChar(')');
-			Utils.matchChar(')');
-			Utils.emitLn("CALL "+ name);
+	public static void term(){
+		factor();
+		while(Utils.isMulop(Utils.token)){
+			Utils.push();
+			switch(Utils.token){
+			case '*':multiply();break;
+			case '/':divide();break;
+			}
 		}
-		else
-			Utils.emitLn("MOV EAX,["+name+"]");
+	}
 	
+	
+	public static void expression(){
+		if(Utils.isAddop(Utils.token))
+			Utils.clear();
+		else
+			term();
+		while(Utils.isAddop(Utils.token)){
+			Utils.push();
+			switch(Utils.token){
+			case '+': add();break;
+			case '-': subtract();break;
+			}
+		}
+	}
+	
+	public static void compareExpression(){
+		expression();
+		Utils.popCompare();
+	}
+	
+	public static void nextExpression(){
+		Utils.next();
+		compareExpression();
+	}
+	
+	public static void equal(){
+		nextExpression();
+		Utils.setEqual();
+	}
+	
+	public static void lessOrEqual(){
+		nextExpression();
+		Utils.setLessOrEqual();
+	}
+	
+	public static void notEqual(){
+		nextExpression();
+		Utils.setNEqual();
+	}
+	
+	public static void less(){
+		Utils.next();
+		switch(Utils.token){
+		case '=':lessOrEqual();break;
+		case '>': notEqual();break;
+		default:compareExpression();Utils.setLess();break;
+		}
+	}
+	
+	public static void greater(){
+		Utils.next();
+		if(Utils.token=='='){
+			nextExpression();
+			Utils.setGreaterOrEqual();
+		}else{
+			compareExpression();
+			Utils.setGreater();
+		}
+	}
+	
+	
+	public static void relation(){
+		expression();
+		if(Utils.isRelOp(Utils.token)){
+			Utils.push();
+			switch(Utils.token){
+			case '=': equal();break;
+			case '<': less();break;
+			case '>': greater();break;
+			}
+		}
+	}
+	
+	public static void notFactor(){
+		if(Utils.look=='!'){
+			Utils.next();
+			relation();
+			Utils.notIt();
+		}else{
+			relation();
+		}
+	}
+	
+	public static void boolTerm(){
+		notFactor();
+		while(Utils.token=='&'){
+			Utils.push();
+			Utils.next();
+			notFactor();
+			Utils.popAnd();
+			
+		}
+	}
+	
+	public static void boolOr(){
+		Utils.next();
+		boolTerm();
+		Utils.popOr();
+	}
+	
+	
+	public static void boolXor(){
+		Utils.next();
+		boolTerm();
+		Utils.popXor();
+	}
+	
+	public static void boolExpression(){
+		boolTerm();
+		while(Utils.isOrOp(Utils.token)){
+			Utils.push();
+			switch(Utils.look){
+			case '|':boolOr();break;
+			case '~':boolXor();break;
+			}
+		}
 	}
 	
 	public static void assignment(){
 		String name;
-		name=Utils.getName();
-		Utils.matchChar('=');
-		expression();
-		//check this
-		//Utils.emitLn("LEA EBX,["+name+"]");
-		Utils.emitLn("MOVE EAX,["+name+"]");
+		Utils.checkTable(Utils.value);
+		name=Utils.value;
+		Utils.next();
+		Utils.matchString("=");
+		boolExpression();
+		Utils.store(name);
 	}
 	
-	public static void other(){
-		Utils.emitLn(Utils.getName());
-	}
-	
-	public static void doProgram(){
-		block("");
-		if(Utils.look!='e')
-			Utils.expected("END");
-		Utils.emitLn("END");
-	}
-	
-	public static void block(String label){
-		while(Utils.look!='e' && Utils.look!='l' && Utils.look!='u'){
-			switch(Utils.look){
-			case 'i': doIf(label);break;
-			case 'w':doWhile();break;
-			case 'p':doLoop();break;
-			case 'r':doRepeat();break;
-			case 'f':doFor();break;
-			case 'd':doDo();break;
-			case 'b':doBreak(label);break;
-			default:other();
-			}
-			//other();			
-		}
-	}
-	
-	public static void condition(){
-		Utils.emitLn("<Condition>");
-	}
-	
-	
-	/*
-	 * Control Constructs
-	 */
-	/*
-	 * Usage: b in any block
-	 */
-	public static void doBreak(String label){
-		Utils.matchChar('b');
-		if(!label.equals(""))
-			Utils.emitLn("JMP "+label);
-		else
-			Utils.abort("No loop to break from");
-	}
-	
-	/*
-	 * BNF: IF <condition> <block> [ ELSE <block>] ENDIF
-	 * Usage: i(if) c(block) l(else) g(block) e(end)
-	 */
-	public static void doIf(String label){
+	public static void doIf(){
 		String l1,l2;
-		Utils.matchChar('i');
-		condition();
+		
+		Utils.next();
+		boolExpression();
 		l1=Utils.newLabel();
 		l2=l1;
-		Utils.emitLn("JZ "+l1);
-		block(label);
-		if(Utils.look=='l'){
-			Utils.matchChar('l');
+		Utils.branchFalse(l1);
+		block();
+		if(Utils.token=='l'){
+			Utils.next();
 			l2=Utils.newLabel();
-			Utils.emitLn("JMP "+l2);
+			Utils.branch(l2);
 			Utils.postLabel(l1);
-			block(label);
+			block();
 		}
-		Utils.matchChar('e');
+		
 		Utils.postLabel(l2);
+		Utils.matchString("ENDIF");
 	}
 	
-	/*
-	 * BNF: WHILE <condition> <block> ENDWHILE
-	 * Usage: w(while) c(block) e(end)
-	 */
 	public static void doWhile(){
 		String l1,l2;
-		Utils.matchChar('w');
+		Utils.next();
 		l1=Utils.newLabel();
 		l2=Utils.newLabel();
 		Utils.postLabel(l1);
-		condition();
-		Utils.emitLn("JZ "+l2);
-		block(l2);
-		Utils.matchChar('e');
-		Utils.emitLn("JMP "+l1);
-		Utils.postLabel(l2);
-	}
-	
-	/*
-	 * BNF: LOOP <block> ENDLOOP
-	 * Usage: p(loop) c(block) e(end)
-	 */
-	public static void doLoop(){
-		String l1,l2;
-		Utils.matchChar('p');
-		l1=Utils.newLabel();
-		l2=Utils.newLabel();
-		Utils.postLabel(l1);
-		block(l2);
-		Utils.matchChar('e');
-		Utils.emitLn("JMP "+l1);
-		Utils.postLabel(l2);
-	}
-	
-	/*
-	 * BNF: REPEAT <block> UNTIL <condition> 
-	 * Usage: r(repeat) c(block) u(until)
-	 */
-	public static void doRepeat(){
-		String l1,l2;
-		Utils.matchChar('r');
-		l1=Utils.newLabel();
-		l2=Utils.newLabel();
-		Utils.postLabel(l1);
-		block(l2);
-		Utils.matchChar('u');
-		condition();
-		Utils.emitLn("JNZ "+l1);
-		Utils.postLabel(l2);
-	}
-	
-	/*
-	 * BNF: FOR <ident> = <expr1> <expr2> <block> ENDFOR
-	 * Usage: f(for) c(ident) = g(block) e(end)
-	 */
-	public static void doFor(){
-		String l1,l2;
-		String name;
-		Utils.matchChar('f');
-		l1=Utils.newLabel();
-		l2=Utils.newLabel();
-		name=Utils.getName();
-		Utils.matchChar('=');
 		boolExpression();
-		Utils.emitLn("DEC EAX");
-		Utils.emitLn("MOV ["+name+"],EAX");
-		boolExpression();
-		Utils.emitLn("PUSH EAX");
-		Utils.postLabel(l1);
-		Utils.emitLn("MOV ["+name+"]+EAX");
-		Utils.emitLn("INC EAX");
-		Utils.emitLn("MOV ["+name+"], EAX");
-		Utils.emitLn("CMP EAX,[ESP]");
-		Utils.emitLn("JGE "+l2);
-		block(l2);
-		Utils.matchChar('e');
-		Utils.emitLn("JMP "+l1);
+		Utils.branchFalse(l2);
+		block();
+		Utils.matchString("ENDWHILE");
+		Utils.branch(l1);
 		Utils.postLabel(l2);
-		Utils.emitLn("INC ESP");
-		Utils.emitLn("INC ESP");
-	}
-	
-	/*
-	 * BNF: DO <expr> <block> ENDDO
-	 * Usage: d(do) c(block) 
-	 */
-	public static void doDo(){
-		String l1,l2;
-		Utils.matchChar('d');
-		l1=Utils.newLabel();
-		l2=Utils.newLabel();
-		boolExpression();
-		Utils.emitLn("DEC EAX");
-		Utils.postLabel(l1);
-		Utils.emitLn("PUSH EAX");
-		block(l2);
-		Utils.emitLn("POP EAX");
-		Utils.emitLn("DEC EAX");
-		Utils.emitLn("JNZ "+l1);
-		Utils.emitLn("DEC ESP");
-		Utils.emitLn("DEC ESP");
-		Utils.postLabel(l2);
-		Utils.emitLn("INC ESP");
-		Utils.emitLn("INC ESP");
 	}
 	
 	
-	/*
-	 * New function for loop variants
-	 */
-	public static void boolExpression(){
-		Utils.emitLn("Dummy expression");
+	
+	public static void readVar(){
+		Utils.checkIdent();
+		Utils.checkTable(Utils.value);
+		Utils.readIt(Utils.value);
+		Utils.next();
+	}
+	
+	public static void doRead(){
+		Utils.next();
+		Utils.matchString("(");
+		readVar();
+		while(Utils.token==','){
+			Utils.next();
+			readVar();
+		}
+		Utils.matchString(")");
+	}
+	
+	public static void doWrite(){
+		Utils.next();
+		Utils.matchString("(");
+		expression();
+		Utils.writeIt();
+		while(Utils.token==','){
+			Utils.next();
+			expression();
+			Utils.writeIt();
+		}
+		Utils.matchString(")");
+		
+	}
+	
+	public static void block(){
+		Utils.scan();
+		while(Utils.token!='e' && Utils.token!='l'){
+			//Utils.fin();
+			switch(Utils.token){
+			case 'i': doIf();break;
+			case 'w':doWhile();break;
+			case 'R': doRead();break;
+			case 'W': doWrite();break;
+			default:assignment();
+			}
+			Utils.scan();		
+		}
+	}
+	
+	public static void alloc(){
+		Utils.next();
+		if(Utils.token!='x')
+			Utils.expected("Variable Name");
+		Utils.checkDup(Utils.value);
+		Utils.addEntry(Utils.value, 'v');
+		Utils.allocate(Utils.value, "0");
+		Utils.next();
+	}
+	
+	public static void topDecls(){
+		Utils.scan();
+		while(Utils.token=='v')
+			alloc();
+		while(Utils.token==',')
+			alloc();
 	}
 	
 	
-	/*
-	 * addOps and mulOps
-	 */
 	public static void add(){
-		Utils.matchChar('+');
+		Utils.next();
 		term();
-		Utils.emitLn("POP EBX");
-		Utils.emitLn("ADD EAX,EBX");
+		Utils.popAdd();
 	}
 	
 	public static void subtract(){
-		Utils.matchChar('-');
+		Utils.next();
 		term();
-		Utils.emitLn("POP EBX");
-		Utils.emitLn("SUB EAX,EBX");
-		Utils.emitLn("NEG EAX");
+		Utils.popSub();
 	}
 	
 	public static void multiply(){
-		Utils.matchChar('*');
+		Utils.next();
 		factor();
-		Utils.emitLn("POP EBX");
-		Utils.emitLn("IMUL EAX,EBX");
+		Utils.popMul();
 	}
 	
 	public static void divide(){
-		Utils.matchChar('/');
+		Utils.next();
 		factor();
-		Utils.emitLn("POP EBX");
-		Utils.emitLn("IDIV EBX");
+		Utils.popDiv();
 	}
 	
 }
