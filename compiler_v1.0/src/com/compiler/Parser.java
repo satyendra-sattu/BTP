@@ -3,30 +3,30 @@ package com.compiler;
 
 
 //Add space error handler
-public class Parser {
+public class Parser extends Utils {
 
 	
-	public static void factor(){
-		if(Utils.token=='('){
-			Utils.next();
+	public  void factor(){
+		if(token=='('){
+			next();
 			boolExpression();
-			Utils.matchString(")");
+			matchString(")");
 		}else{
-			if(Utils.token=='x')
-				Utils.loadVar(Utils.value);
-			else if(Utils.token=='#')
-				Utils.loadConst(Utils.value);
+			if(token=='x')
+				loadVar(value);
+			else if(token=='#')
+				loadConst(value);
 			else
-				Utils.expected("Math Factor");
-			Utils.next();
+				expected("Math Factor");
+			next();
 		}
 	}
 	
-	public static void term(){
+	public  void term(){
 		factor();
-		while(Utils.isMulop(Utils.token)){
-			Utils.push();
-			switch(Utils.token){
+		while(isMulop(token)){
+			push();
+			switch(token){
 			case '*':multiply();break;
 			case '/':divide();break;
 			}
@@ -34,71 +34,71 @@ public class Parser {
 	}
 	
 	
-	public static void expression(){
-		if(Utils.isAddop(Utils.token))
-			Utils.clear();
+	public  void expression(){
+		if(isAddop(token))
+			clear();
 		else
 			term();
-		while(Utils.isAddop(Utils.token)){
-			Utils.push();
-			switch(Utils.token){
+		while(isAddop(token)){
+			push();
+			switch(token){
 			case '+': add();break;
 			case '-': subtract();break;
 			}
 		}
 	}
 	
-	public static void compareExpression(){
+	public  void compareExpression(){
 		expression();
-		Utils.popCompare();
+		popCompare();
 	}
 	
-	public static void nextExpression(){
-		Utils.next();
+	public  void nextExpression(){
+		next();
 		compareExpression();
 	}
 	
-	public static void equal(){
+	public  void equal(){
 		nextExpression();
-		Utils.setEqual();
+		setEqual();
 	}
 	
-	public static void lessOrEqual(){
+	public  void lessOrEqual(){
 		nextExpression();
-		Utils.setLessOrEqual();
+		setLessOrEqual();
 	}
 	
-	public static void notEqual(){
+	public  void notEqual(){
 		nextExpression();
-		Utils.setNEqual();
+		setNEqual();
 	}
 	
-	public static void less(){
-		Utils.next();
-		switch(Utils.token){
+	public  void less(){
+		next();
+		switch(token){
 		case '=':lessOrEqual();break;
 		case '>': notEqual();break;
-		default:compareExpression();Utils.setLess();break;
+		default:compareExpression();setLess();break;
 		}
 	}
 	
-	public static void greater(){
-		Utils.next();
-		if(Utils.token=='='){
+	public  void greater(){
+		next();
+		if(token=='='){
 			nextExpression();
-			Utils.setGreaterOrEqual();
+			setGreaterOrEqual();
 		}else{
 			compareExpression();
-			Utils.setGreater();
+			setGreater();
 		}
 	}
 	
 	
-	public static void relation(){
+	public  void relation(){
 		expression();
-		if(Utils.isRelOp(Utils.token)){
-			Utils.push();
-			switch(Utils.token){
+		if(isRelOp(token)){
+			push();
+			switch(token){
 			case '=': equal();break;
 			case '<': less();break;
 			case '>': greater();break;
@@ -106,186 +106,186 @@ public class Parser {
 		}
 	}
 	
-	public static void notFactor(){
-		if(Utils.look=='!'){
-			Utils.next();
+	public  void notFactor(){
+		if(look=='!'){
+			next();
 			relation();
-			Utils.notIt();
+			notIt();
 		}else{
 			relation();
 		}
 	}
 	
-	public static void boolTerm(){
+	public  void boolTerm(){
 		notFactor();
-		while(Utils.token=='&'){
-			Utils.push();
-			Utils.next();
+		while(token=='&'){
+			push();
+			next();
 			notFactor();
-			Utils.popAnd();
+			popAnd();
 			
 		}
 	}
 	
-	public static void boolOr(){
-		Utils.next();
+	public  void boolOr(){
+		next();
 		boolTerm();
-		Utils.popOr();
+		popOr();
 	}
 	
 	
-	public static void boolXor(){
-		Utils.next();
+	public  void boolXor(){
+		next();
 		boolTerm();
-		Utils.popXor();
+		popXor();
 	}
 	
-	public static void boolExpression(){
+	public  void boolExpression(){
 		boolTerm();
-		while(Utils.isOrOp(Utils.token)){
-			Utils.push();
-			switch(Utils.look){
+		while(isOrOp(token)){
+			push();
+			switch(look){
 			case '|':boolOr();break;
 			case '~':boolXor();break;
 			}
 		}
 	}
 	
-	public static void assignment(){
+	public  void assignment(){
 		String name;
-		Utils.checkTable(Utils.value);
-		name=Utils.value;
-		Utils.next();
-		Utils.matchString("=");
+		checkTable(value);
+		name=value;
+		next();
+		matchString("=");
 		boolExpression();
-		Utils.store(name);
+		store(name);
 	}
 	
-	public static void doIf(){
+	public  void doIf(){
 		String l1,l2;
 		
-		Utils.next();
+		next();
 		boolExpression();
-		l1=Utils.newLabel();
+		l1=newLabel();
 		l2=l1;
-		Utils.branchFalse(l1);
+		branchFalse(l1);
 		block();
-		if(Utils.token=='l'){
-			Utils.next();
-			l2=Utils.newLabel();
-			Utils.branch(l2);
-			Utils.postLabel(l1);
+		if(token=='l'){
+			next();
+			l2=newLabel();
+			branch(l2);
+			postLabel(l1);
 			block();
 		}
 		
-		Utils.postLabel(l2);
-		Utils.matchString("ENDIF");
+		postLabel(l2);
+		matchString("ENDIF");
 	}
 	
-	public static void doWhile(){
+	public  void doWhile(){
 		String l1,l2;
-		Utils.next();
-		l1=Utils.newLabel();
-		l2=Utils.newLabel();
-		Utils.postLabel(l1);
+		next();
+		l1=newLabel();
+		l2=newLabel();
+		postLabel(l1);
 		boolExpression();
-		Utils.branchFalse(l2);
+		branchFalse(l2);
 		block();
-		Utils.matchString("ENDWHILE");
-		Utils.branch(l1);
-		Utils.postLabel(l2);
+		matchString("ENDWHILE");
+		branch(l1);
+		postLabel(l2);
 	}
 	
 	
 	
-	public static void readVar(){
-		Utils.checkIdent();
-		Utils.checkTable(Utils.value);
-		Utils.readIt(Utils.value);
-		Utils.next();
+	public  void readVar(){
+		checkIdent();
+		checkTable(value);
+		readIt(value);
+		next();
 	}
 	
-	public static void doRead(){
-		Utils.next();
-		Utils.matchString("(");
+	public  void doRead(){
+		next();
+		matchString("(");
 		readVar();
-		while(Utils.token==','){
-			Utils.next();
+		while(token==','){
+			next();
 			readVar();
 		}
-		Utils.matchString(")");
+		matchString(")");
 	}
 	
-	public static void doWrite(){
-		Utils.next();
-		Utils.matchString("(");
+	public  void doWrite(){
+		next();
+		matchString("(");
 		expression();
-		Utils.writeIt();
-		while(Utils.token==','){
-			Utils.next();
+		writeIt();
+		while(token==','){
+			next();
 			expression();
-			Utils.writeIt();
+			writeIt();
 		}
-		Utils.matchString(")");
+		matchString(")");
 		
 	}
 	
-	public static void block(){
-		Utils.scan();
-		while(Utils.token!='e' && Utils.token!='l'){
-			//Utils.fin();
-			switch(Utils.token){
+	public  void block(){
+		scan();
+		while(token!='e' && token!='l'){
+			//fin();
+			switch(token){
 			case 'i': doIf();break;
 			case 'w':doWhile();break;
 			case 'R': doRead();break;
 			case 'W': doWrite();break;
 			default:assignment();
 			}
-			Utils.scan();		
+			scan();		
 		}
 	}
 	
-	public static void alloc(){
-		Utils.next();
-		if(Utils.token!='x')
-			Utils.expected("Variable Name");
-		Utils.checkDup(Utils.value);
-		Utils.addEntry(Utils.value, 'v');
-		Utils.allocate(Utils.value, "0");
-		Utils.next();
+	public  void alloc(){
+		next();
+		if(token!='x')
+			expected("Variable Name");
+		checkDup(value);
+		addEntry(value, 'v');
+		allocate(value, "0");
+		next();
 	}
 	
-	public static void topDecls(){
-		Utils.scan();
-		while(Utils.token=='v')
+	public  void topDecls(){
+		scan();
+		while(token=='v')
 			alloc();
-		while(Utils.token==',')
+		while(token==',')
 			alloc();
 	}
 	
 	
-	public static void add(){
-		Utils.next();
+	public  void add(){
+		next();
 		term();
-		Utils.popAdd();
+		popAdd();
 	}
 	
-	public static void subtract(){
-		Utils.next();
+	public  void subtract(){
+		next();
 		term();
-		Utils.popSub();
+		popSub();
 	}
 	
-	public static void multiply(){
-		Utils.next();
+	public  void multiply(){
+		next();
 		factor();
-		Utils.popMul();
+		popMul();
 	}
 	
-	public static void divide(){
-		Utils.next();
+	public  void divide(){
+		next();
 		factor();
-		Utils.popDiv();
+		popDiv();
 	}
 	
 }
